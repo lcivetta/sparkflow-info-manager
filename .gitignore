@@ -1,0 +1,20 @@
+# Xcode user state and build output
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+
+# macOS
+.DS_Store
+
+# Secrets and local configuration
+.env
+.env.*
+*.xcconfig.local
+Secrets.xcconfig
+
+# Swift Package Manager caches, if packages are added later
+.build/
+.swiftpm/
