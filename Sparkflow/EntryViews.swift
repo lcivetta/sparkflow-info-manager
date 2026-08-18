@@ -3,12 +3,11 @@ import SwiftUI
 
 struct NotesHomeView: View {
   @Environment(\.modelContext) private var modelContext
-  @Query(sort: \NoteFolder.sortOrder) private var folders: [NoteFolder]
   @Query(sort: \SparkNote.modifiedAt, order: .reverse) private var notes: [SparkNote]
   @Binding var showingSpark: Bool
   @State private var searchText = ""
-  @State private var showingNewFolder = false
-  @State private var folderName = ""
+  @State private var createdNote: SparkNote?
+  @State private var showingCreatedNote = false
 
   private var filteredNotes: [SparkNote] {
     guard !searchText.isEmpty else { return notes }
@@ -18,98 +17,74 @@ struct NotesHomeView: View {
     }
   }
 
+  private var pinnedNotes: [SparkNote] { filteredNotes.filter(\.isPinned) }
+  private var unpinnedNotes: [SparkNote] { filteredNotes.filter { !$0.isPinned } }
+
   var body: some View {
     List {
-      if !searchText.isEmpty {
-        Section("Search Results") {
-          ForEach(filteredNotes) { note in
-            NavigationLink {
-              NoteEditorView(note: note)
-            } label: {
-              NoteRow(note: note)
-            }
-          }
-        }
+      if filteredNotes.isEmpty {
+        ContentUnavailableView(
+          searchText.isEmpty ? "No Notes" : "No Results",
+          systemImage: searchText.isEmpty ? "note.text" : "magnifyingglass",
+          description: Text(
+            searchText.isEmpty
+              ? "Create a note or ask Spark to capture one."
+              : "No notes match “\(searchText)”."))
       } else {
-        Section("Folders") {
-          NavigationLink {
-            AllNotesView(showingSpark: $showingSpark)
-          } label: {
-            Label {
-              countLabel("All Notes", count: notes.count)
-            } icon: {
-              folderIcon("tray.full", color: .orange)
-            }
-          }
-          ForEach(folders) { folder in
-            NavigationLink {
-              FolderNotesView(folder: folder, showingSpark: $showingSpark)
-            } label: {
-              Label {
-                countLabel(folder.name, count: folder.notes.count)
-              } icon: {
-                folderIcon(folder.systemImage, color: .orange)
-              }
-            }
+        if !pinnedNotes.isEmpty {
+          Section("Pinned") {
+            noteRows(pinnedNotes)
           }
         }
-
-        if !notes.isEmpty {
-          Section("Recent") {
-            ForEach(notes.prefix(4)) { note in
-              NavigationLink {
-                NoteEditorView(note: note)
-              } label: {
-                NoteRow(note: note)
-              }
-            }
+        if !unpinnedNotes.isEmpty {
+          Section("Notes") {
+            noteRows(unpinnedNotes)
           }
         }
       }
     }
-    .navigationTitle("Sparkflow")
+    .navigationTitle("Notes")
     .searchable(text: $searchText, prompt: "Search notes")
     .toolbar {
-      ToolbarItem(placement: .topBarLeading) { EditButton() }
       ToolbarItemGroup(placement: .topBarTrailing) {
-        Button {
-          showingNewFolder = true
-        } label: {
-          Image(systemName: "folder.badge.plus")
-        }
         Button {
           showingSpark = true
         } label: {
-          Image(systemName: "sparkles")
+          Image(systemName: "waveform")
         }
-        .accessibilityLabel("Ask Spark")
+        .accessibilityLabel("Talk to Spark")
+        Button {
+          createNote()
+        } label: {
+          Image(systemName: "square.and.pencil")
+        }
+        .accessibilityLabel("New Note")
       }
     }
-    .alert("New Folder", isPresented: $showingNewFolder) {
-      TextField("Name", text: $folderName)
-      Button("Cancel", role: .cancel) { folderName = "" }
-      Button("Create") { createFolder() }.disabled(
-        folderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    .navigationDestination(isPresented: $showingCreatedNote) {
+      if let createdNote {
+        NoteEditorView(note: createdNote)
+      }
     }
   }
 
-  private func countLabel(_ title: String, count: Int) -> some View {
-    HStack {
-      Text(title)
-      Spacer()
-      Text(count, format: .number).foregroundStyle(.secondary)
+  @ViewBuilder
+  private func noteRows(_ sectionNotes: [SparkNote]) -> some View {
+    ForEach(sectionNotes) { note in
+      NavigationLink {
+        NoteEditorView(note: note)
+      } label: {
+        NoteRow(note: note)
+      }
     }
+    .onDelete { offsets in offsets.map { sectionNotes[$0] }.forEach(modelContext.delete) }
   }
 
-  private func folderIcon(_ name: String, color: Color) -> some View {
-    Image(systemName: name).foregroundStyle(color).frame(width: 28)
-  }
-
-  private func createFolder() {
-    modelContext.insert(
-      NoteFolder(
-        name: folderName.trimmingCharacters(in: .whitespacesAndNewlines), sortOrder: folders.count))
-    folderName = ""
+  private func createNote() {
+    let note = SparkNote(title: "", body: "")
+    modelContext.insert(note)
+    createdNote = note
+    showingCreatedNote = true
   }
 }
 

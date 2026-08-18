@@ -15,12 +15,12 @@ struct SparkCommandView: View {
       VStack(spacing: 22) {
         sparkMark
         VStack(spacing: 7) {
-          Text(preview == nil ? "What should Spark change?" : "Review Spark’s proposal")
+          Text(preview == nil ? "What should Spark change?" : "Spark understood this")
             .font(.title.bold()).multilineTextAlignment(.center)
           Text(
             preview == nil
               ? "Describe a new note or a precise change in your own words."
-              : "This creates a review card. Your notes will not change yet."
+              : "Confirm the action, heading, and content before it enters Review."
           )
           .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
         }
@@ -82,14 +82,17 @@ struct SparkCommandView: View {
         voice.toggle()
       } label: {
         Label(
-          voice.isListening ? "Listening… Tap to Stop" : "Talk to Spark",
-          systemImage: voice.isListening ? "waveform" : "mic.fill"
+          voice.isStarting
+            ? "Starting Microphone…"
+            : (voice.isListening ? "Listening… Tap to Stop" : "Talk to Spark"),
+          systemImage: voice.isStarting ? "ellipsis" : (voice.isListening ? "waveform" : "mic.fill")
         )
         .frame(maxWidth: .infinity)
       }
       .buttonStyle(.bordered)
       .buttonBorderShape(.capsule)
       .tint(voice.isListening ? .red : .orange)
+      .disabled(voice.isStarting)
 
       ScrollView(.horizontal, showsIndicators: false) {
         HStack {
@@ -120,6 +123,7 @@ struct SparkCommandView: View {
     VStack(alignment: .leading, spacing: 14) {
       Label(interpretation.kind.title, systemImage: interpretation.kind.systemImage)
         .font(.caption.bold()).foregroundStyle(.orange)
+      LabeledContent("Action", value: interpretation.kind.title)
       if !interpretation.targetTitle.isEmpty {
         LabeledContent("Note", value: interpretation.targetTitle)
       }
@@ -134,11 +138,24 @@ struct SparkCommandView: View {
           interpretation.kind == .replace ? "AFTER" : "PROPOSED", interpretation.newText,
           color: .green)
       }
+      if let clarification = interpretation.clarification {
+        Label(clarification, systemImage: "questionmark.bubble")
+          .font(.subheadline)
+          .foregroundStyle(.orange)
+          .padding(12)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(Color.orange.opacity(0.1), in: .rect(cornerRadius: 12))
+      } else {
+        Label(interpretation.spokenSummary, systemImage: "quote.bubble")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+      }
       HStack {
         Button("Edit Request") { preview = nil }
           .buttonStyle(.bordered).frame(maxWidth: .infinity)
-        Button("Add to Review") { saveProposal(interpretation) }
+        Button("Confirm & Add") { saveProposal(interpretation) }
           .buttonStyle(.borderedProminent).frame(maxWidth: .infinity)
+          .disabled(interpretation.clarification != nil)
       }
       .buttonBorderShape(.capsule)
     }

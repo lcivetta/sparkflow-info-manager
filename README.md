@@ -136,6 +136,8 @@ Open the Review tab to inspect pending changes:
 
 After installing and launching Sparkflow, try:
 
+- “Hey Siri, talk to Sparkflow.”
+- “Hey Siri, talk to Spark in Sparkflow.”
 - “Hey Siri, capture with Sparkflow.”
 - “Hey Siri, ask Spark in Sparkflow.”
 - “Hey Siri, review Spark changes in Sparkflow.”

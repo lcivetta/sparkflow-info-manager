@@ -151,12 +151,45 @@ struct SparkInterpretation {
   var proposedTitle: String
   var originalText: String
   var newText: String
+
+  var heading: String { kind == .create ? proposedTitle : targetTitle }
+
+  var clarification: String? {
+    if heading.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      return "Which heading or note should Spark use?"
+    }
+    if kind != .delete && newText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      return "What exact content should Spark add or change?"
+    }
+    if kind == .replace && originalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      return "What existing words should Spark replace? Put them in quotation marks."
+    }
+    return nil
+  }
+
+  var spokenSummary: String {
+    switch kind {
+    case .create: "Create a new note titled \(heading), containing: \(newText)"
+    case .append: "Add to \(heading): \(newText)"
+    case .replace: "In \(heading), replace \(originalText) with \(newText)"
+    case .delete: "Delete the note titled \(heading)"
+    }
+  }
 }
 
 enum SparkInterpreter {
   static func interpret(_ command: String, notes: [SparkNote]) -> SparkInterpretation {
     let clean = command.trimmingCharacters(in: .whitespacesAndNewlines)
     let lower = clean.lowercased()
+
+    if lower.contains("create") || lower.contains("new note") || lower.contains("new list") {
+      let title = textBetweenTitleAndBodyMarkers(in: clean)
+      let body = textAfterAnyMarker(
+        in: clean, markers: ["that says ", "containing ", "with the content ", "with "])
+      return SparkInterpretation(
+        kind: .create, targetTitle: "", proposedTitle: title, originalText: "",
+        newText: formattedBody(body, command: lower))
+    }
 
     if lower.contains("delete") || lower.contains("remove the note") {
       let target = bestMatchingNote(in: clean, notes: notes)
@@ -183,9 +216,8 @@ enum SparkInterpreter {
       let addition =
         quoted.last ?? textAfterAnyMarker(in: clean, markers: ["that says ", "saying ", "add "])
       return SparkInterpretation(
-        kind: target == nil ? .create : .append, targetTitle: target?.title ?? "",
-        proposedTitle: target == nil ? inferredTitle(from: addition) : "", originalText: "",
-        newText: addition)
+        kind: .append, targetTitle: target?.title ?? "", proposedTitle: "", originalText: "",
+        newText: formattedBody(addition, command: lower))
     }
 
     let title = inferredTitle(from: clean)
@@ -220,6 +252,31 @@ enum SparkInterpreter {
       }
     }
     return value
+  }
+
+  private static func textBetweenTitleAndBodyMarkers(in value: String) -> String {
+    let lower = value.lowercased()
+    let titleMarkers = [" called ", " named ", " titled "]
+    let bodyMarkers = [" that says ", " containing ", " with the content ", " with "]
+    guard let titleStart = titleMarkers.compactMap({ lower.range(of: $0) }).min(by: {
+      $0.lowerBound < $1.lowerBound
+    }) else { return "" }
+    let contentStart = titleStart.upperBound
+    let remainder = lower[contentStart...]
+    let bodyStart = bodyMarkers.compactMap { remainder.range(of: $0) }.min {
+      $0.lowerBound < $1.lowerBound
+    }
+    let end = bodyStart?.lowerBound ?? lower.endIndex
+    return String(value[contentStart..<end]).trimmingCharacters(
+      in: .whitespacesAndNewlines.union(.punctuationCharacters))
+  }
+
+  private static func formattedBody(_ body: String, command: String) -> String {
+    let clean = body.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard (command.contains("bullet") || command.contains("list")), !clean.hasPrefix("•") else {
+      return clean
+    }
+    return "• \(clean)"
   }
 
   private static func inferredTitle(from text: String) -> String {

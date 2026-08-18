@@ -9,18 +9,23 @@ struct CaptureWithSparkflowIntent: AppIntent {
   @Parameter(
     title: "Request", description: "The idea or note change for Spark to prepare.",
     requestValueDialog: IntentDialog("What should Spark capture?"))
-  var request: String
+  var request: String?
 
   static var parameterSummary: some ParameterSummary { Summary("Ask Spark to \(\.$request)") }
 
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    let schema = Schema([
-      NoteFolder.self, SparkNote.self, SparkProposal.self, ChangeAuditEvent.self,
-    ])
-    let container = try ModelContainer(for: schema)
+    guard let request, !request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      throw $request.requestValue("What should Spark capture?")
+    }
+    let container = try SparkflowStore.makeContainer()
     let context = ModelContext(container)
     let notes = try context.fetch(FetchDescriptor<SparkNote>())
     let result = SparkInterpreter.interpret(request, notes: notes)
+    if let clarification = result.clarification {
+      return .result(
+        dialog: "Spark needs one clarification: \(clarification) Open Sparkflow to finish the request."
+      )
+    }
     let target = notes.first { $0.title.caseInsensitiveCompare(result.targetTitle) == .orderedSame }
     context.insert(
       SparkProposal(
@@ -36,7 +41,7 @@ struct CaptureWithSparkflowIntent: AppIntent {
       ))
     try context.save()
     return .result(
-      dialog: "Spark prepared that change. Review it in Sparkflow before it is applied.")
+      dialog: "Spark understood: \(result.spokenSummary). It is waiting in Review.")
   }
 }
 
@@ -55,6 +60,7 @@ struct SparkflowShortcuts: AppShortcutsProvider {
     AppShortcut(
       intent: CaptureWithSparkflowIntent(),
       phrases: [
+        "Talk to \(.applicationName)", "Talk to Spark in \(.applicationName)",
         "Capture with \(.applicationName)", "Tell \(.applicationName)",
         "Ask Spark in \(.applicationName)",
       ],
