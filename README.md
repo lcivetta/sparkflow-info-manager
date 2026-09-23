@@ -2,6 +2,10 @@
 
 > From spark to flow in seconds.
 
+[![Watch the Sparkflow product demo](docs/assets/sparkflow-demo-thumbnail.jpg)](docs/assets/sparkflow-product-demo.mp4)
+
+### [Watch the 92-second product demo →](docs/assets/sparkflow-product-demo.mp4)
+
 Sparkflow is a native iPhone notes app with a human-in-the-loop agent named Spark. Users describe a note or change in natural language, Spark converts the request into a structured proposal, and the user reviews the exact result before anything is applied.
 
 Sparkflow is currently a local-first MVP and reference application. It does not require a paid API or backend to demonstrate its core workflow.
